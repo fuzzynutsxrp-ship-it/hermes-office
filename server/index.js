@@ -2,7 +2,7 @@ const http = require("node:http");
 const https = require("node:https");
 const fs = require("node:fs");
 const path = require("node:path");
-const { spawn } = require("node:child_process");
+const { spawn, execSync } = require("node:child_process");
 const next = require("next");
 
 const { createAccessGate } = require("./access-gate");
@@ -14,8 +14,37 @@ const { loadUpstreamGatewaySettings } = require("./studio-settings");
 // Auto-start the Hermes Gateway Adapter (port 18789) + Worker
 // ---------------------------------------------------------------------------
 
+const ADAPTER_PORT = parseInt(process.env.HERMES_ADAPTER_PORT || "18789", 10);
 let adapterProcess = null;
 let adapterStartAt = 0;
+let adapterRetried = false;
+
+/**
+ * Try to find and kill the process occupying a TCP port.
+ * @param {number} port
+ * @returns {boolean} true if at least one process was killed
+ */
+function killPortOccupant(port) {
+  try {
+    const pidStr = execSync(`lsof -ti:${port}`, { encoding: "utf8", timeout: 5000 }).trim();
+    if (!pidStr) return false;
+    const pids = pidStr.split(/\s+/).filter(Boolean);
+    for (const pid of pids) {
+      try {
+        process.kill(Number(pid), "SIGTERM");
+        console.info(`[server] Killed stale process ${pid} holding port ${port}.`);
+      } catch {
+        // PID may already be gone
+      }
+    }
+    // Give the OS a moment to release the port
+    execSync("sleep 1");
+    return true;
+  } catch {
+    // lsof returns exit 1 when nothing found — not an error
+    return false;
+  }
+}
 
 function spawnAdapter() {
   const adapterPath = path.join(__dirname, "hermes-gateway-adapter.js");
@@ -57,10 +86,18 @@ function spawnAdapter() {
       return;
     }
     if (code !== 0) {
-      // If it died within 5s of starting, likely EADDRINUSE (port already taken)
-      // — don't restart in a loop, just log and continue.
       if (uptimeMs < 5_000) {
-        console.warn(`[server] Adapter exited quickly (code ${code}). Port may already be in use. Skipping restart.`);
+        // Quick exit — likely EADDRINUSE (port already taken)
+        if (!adapterRetried) {
+          adapterRetried = true;
+          console.info("[server] Adapter exited quickly — port may be stuck. Attempting auto-recovery...");
+          if (killPortOccupant(ADAPTER_PORT)) {
+            console.info("[server] Cleared stale port occupant. Restarting adapter...");
+            setTimeout(spawnAdapter, 1_500);
+            return;
+          }
+        }
+        console.warn(`[server] Adapter exited quickly (code ${code}). Could not auto-recover. Skipping restart.`);
       } else {
         console.warn(`[server] Adapter exited with code ${code}. Restarting in 5s...`);
         setTimeout(spawnAdapter, 5_000);
@@ -140,6 +177,8 @@ async function main() {
   const useHttps = process.argv.includes("--https") || process.env.HTTPS === "true";
 
   // Auto-start the gateway adapter + worker (port 18789) before the UI server
+  // Pre-kill any stale process on the adapter port
+  killPortOccupant(ADAPTER_PORT);
   spawnAdapter();
 
   // Graceful shutdown — stop adapter when server exits

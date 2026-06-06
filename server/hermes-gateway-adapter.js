@@ -25,7 +25,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const { WebSocketServer } = require("ws");
 
 function loadDotenvFile(filePath) {
@@ -60,6 +60,7 @@ loadRuntimeEnv();
 const HERMES_API_URL = (process.env.HERMES_API_URL || "http://localhost:8642").replace(/\/$/, "");
 const HERMES_API_KEY = process.env.HERMES_API_KEY || "";
 const ADAPTER_PORT = parseInt(process.env.HERMES_ADAPTER_PORT || "18789", 10);
+let actualAdapterPort = ADAPTER_PORT; // updated if port recovery triggers a fallback
 const HERMES_MODEL = process.env.HERMES_MODEL || "hermes";
 const HERMES_AGENT_NAME = process.env.HERMES_AGENT_NAME || "Hermes";
 const HOME = process.env.HOME || "/tmp";
@@ -1228,6 +1229,89 @@ async function handleMethod(method, params, id, sendEvent) {
 }
 
 // ---------------------------------------------------------------------------
+// Port-conflict recovery
+// ---------------------------------------------------------------------------
+
+/**
+ * Try to find and kill the process occupying a TCP port.
+ * @param {number} port
+ * @returns {boolean} true if the port was freed
+ */
+function killPortOccupant(port) {
+  try {
+    // lsof works on both Linux and macOS
+    const pidStr = execSync(`lsof -ti:${port}`, { encoding: "utf8", timeout: 5000 }).trim();
+    if (!pidStr) return false;
+    const pids = pidStr.split(/\s+/).filter(Boolean);
+    for (const pid of pids) {
+      try {
+        process.kill(Number(pid), "SIGTERM");
+        console.log(`[hermes-adapter] Killed stale process ${pid} on port ${port}.`);
+      } catch {
+        // PID may already be gone
+      }
+    }
+    // Give the OS a moment to release the port
+    execSync("sleep 1");
+    return true;
+  } catch {
+    // lsof returns exit 1 when nothing found — not an error
+    return false;
+  }
+}
+
+/**
+ * Try to start the HTTP server with automatic port-conflict recovery.
+ * 1. If primary port is blocked, kill the occupant and retry.
+ * 2. If still blocked, fall back to ADAPTER_PORT + 1.
+ * @param {import("http").Server} httpServer
+ * @param {number} port
+ * @param {(actualPort: number) => void} onSuccess
+ */
+function listenWithRecovery(httpServer, port, onSuccess) {
+  let attemptedKill = false;
+  let fallbackPort = port + 1; // 18790
+
+  const tryListen = (p) => {
+    httpServer.once("error", (err) => {
+      if (err.code === "EADDRINUSE") {
+        if (!attemptedKill) {
+          // First failure — try killing the occupant
+          attemptedKill = true;
+          console.warn(`[hermes-adapter] Port ${p} in use. Attempting to kill stale process...`);
+          if (killPortOccupant(p)) {
+            console.log(`[hermes-adapter] Port ${p} freed. Retrying...`);
+            tryListen(p);
+            return;
+          }
+        }
+        // Kill didn't help (or already tried) — fall back
+        console.warn(`[hermes-adapter] Port ${p} still blocked. Falling back to port ${fallbackPort}.`);
+        tryListen(fallbackPort);
+      } else {
+        console.error("[hermes-adapter] Server error:", sanitizeErrorMessage(err));
+        process.exit(1);
+      }
+    });
+
+    httpServer.listen(p, "127.0.0.1", () => {
+      if (p !== port) {
+        console.log(`[hermes-adapter] ⚠ Running on fallback port ${p} (primary ${port} was occupied).`);
+        console.log(`[hermes-adapter]   Set HERMES_ADAPTER_PORT=${p} or update Claw3D gateway URL.`);
+        // Broadcast to any early WS clients
+        broadcastEvent({
+          type: "event", event: "adapter.status",
+          payload: { portChanged: true, from: port, to: p, message: `Adapter restarted on port ${p}` },
+        });
+      }
+      onSuccess(p);
+    });
+  };
+
+  tryListen(port);
+}
+
+// ---------------------------------------------------------------------------
 // WebSocket server
 // ---------------------------------------------------------------------------
 
@@ -1315,21 +1399,15 @@ function startAdapter() {
     });
   });
 
-  httpServer.listen(ADAPTER_PORT, "127.0.0.1", () => {
-    console.log(`\n[hermes-adapter] ✓ Listening on ws://localhost:${ADAPTER_PORT}`);
+  listenWithRecovery(httpServer, ADAPTER_PORT, (actualPort) => {
+    if (actualPort !== ADAPTER_PORT) {
+      actualAdapterPort = actualPort;
+    }
+    console.log(`\n[hermes-adapter] ✓ Listening on ws://localhost:${actualPort}`);
     console.log(`[hermes-adapter] ✓ Forwarding to Hermes API at ${HERMES_API_URL}`);
     console.log(`[hermes-adapter] ✓ Model: ${HERMES_MODEL}`);
     console.log(`[hermes-adapter] ✓ Multi-agent orchestration: ENABLED`);
-    console.log(`\nOpen Claw3D → ws://localhost:${ADAPTER_PORT}\n`);
-  });
-
-  httpServer.on("error", (err) => {
-    if (err.code === "EADDRINUSE") {
-      console.error(`[hermes-adapter] Port ${ADAPTER_PORT} in use. Set HERMES_ADAPTER_PORT to change it.`);
-    } else {
-      console.error("[hermes-adapter] Server error:", sanitizeErrorMessage(err));
-    }
-    process.exit(1);
+    console.log(`\nOpen Claw3D → ws://localhost:${actualPort}\n`);
   });
 }
 
@@ -1349,7 +1427,7 @@ function spawnWorker() {
   console.log("[hermes-adapter] Starting autonomous worker agent...");
   workerProcess = spawn(process.execPath, [workerPath], {
     stdio: ["ignore", "pipe", "pipe"],
-    env: { ...process.env, HERMES_ADAPTER_PORT: String(ADAPTER_PORT) },
+    env: { ...process.env, HERMES_ADAPTER_PORT: String(actualAdapterPort) },
   });
 
   workerProcess.stdout.on("data", (data) => {

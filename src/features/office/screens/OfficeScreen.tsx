@@ -1067,6 +1067,7 @@ export function OfficeScreen({
   const [workerOnline, setWorkerOnline] = useState(false);
   const [lastWorkerPollAt, setLastWorkerPollAt] = useState<number | null>(null);
   const [workerPollError, setWorkerPollError] = useState<string | null>(null);
+  const [adapterStatusToast, setAdapterStatusToast] = useState<string | null>(null);
 
   const handleForceReconnect = useCallback(async () => {
     disconnect();
@@ -2962,6 +2963,14 @@ export function OfficeScreen({
           setWorkerOnline(payload.online);
         }
       }
+      // Track adapter port recovery
+      if (event.event === "adapter.status") {
+        const payload = event.payload as { portChanged?: boolean; message?: string } | undefined;
+        if (payload?.portChanged && payload.message) {
+          setAdapterStatusToast(payload.message);
+          setTimeout(() => setAdapterStatusToast(null), 12_000);
+        }
+      }
       setOfficeTriggerState((previous) =>
         reduceOfficeAnimationTriggerEvent({
           state: previous,
@@ -4775,6 +4784,14 @@ export function OfficeScreen({
 
   return (
     <main className="relative h-full w-full overflow-hidden bg-black">
+      {adapterStatusToast ? (
+        <div
+          className="pointer-events-none absolute top-12 left-1/2 z-[999] -translate-x-1/2 animate-pulse rounded-lg border border-cyan-500/40 bg-cyan-950/90 px-4 py-2 text-xs font-medium text-cyan-200 shadow-lg backdrop-blur-sm"
+          role="status"
+        >
+          ⚡ {adapterStatusToast}
+        </div>
+      ) : null}
       {showGatewayLoadingOverlay ? (
         <div
           className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-[#120a05]/76"
