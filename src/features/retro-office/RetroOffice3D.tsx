@@ -2339,6 +2339,7 @@ export function RetroOffice3D({
   taskBoardCronLoading = false,
   taskBoardCronError = null,
   taskBoardCaptureDebug,
+  taskBoardWorkerOnline = false,
   onTaskBoardCreateCard,
   onTaskBoardMoveCard,
   onTaskBoardSelectCard,
@@ -2459,6 +2460,7 @@ export function RetroOffice3D({
   taskBoardCaptureDebug?: ComponentProps<
     typeof KanbanImmersiveScreen
   >["taskCaptureDebug"];
+  taskBoardWorkerOnline?: boolean;
   onTaskBoardCreateCard?: () => void;
   onTaskBoardMoveCard?: (cardId: string, status: TaskBoardStatus) => void;
   onTaskBoardSelectCard?: (cardId: string | null) => void;
@@ -6464,6 +6466,7 @@ export function RetroOffice3D({
           cronLoading={taskBoardCronLoading}
           cronError={taskBoardCronError}
           taskCaptureDebug={taskBoardCaptureDebug}
+          workerOnline={taskBoardWorkerOnline}
           onCreateCard={() => onTaskBoardCreateCard?.()}
           onMoveCard={(cardId, status) => onTaskBoardMoveCard?.(cardId, status)}
           onSelectCard={(cardId) => onTaskBoardSelectCard?.(cardId)}

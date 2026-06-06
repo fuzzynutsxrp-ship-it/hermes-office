@@ -15,6 +15,7 @@ export function TaskBoardPanel({
   cronLoading,
   cronError,
   taskCaptureDebug,
+  workerOnline,
   onCreateCard,
   onMoveCard,
   onSelectCard,
@@ -30,6 +31,7 @@ export function TaskBoardPanel({
   cronLoading: boolean;
   cronError: string | null;
   taskCaptureDebug?: ComponentProps<typeof TaskBoardView>["taskCaptureDebug"];
+  workerOnline: boolean;
   onCreateCard: () => void;
   onMoveCard: (cardId: string, status: TaskBoardStatus) => void;
   onSelectCard: (cardId: string | null) => void;
@@ -49,6 +51,7 @@ export function TaskBoardPanel({
       cronLoading={cronLoading}
       cronError={cronError}
       taskCaptureDebug={taskCaptureDebug}
+      workerOnline={workerOnline}
       onCreateCard={onCreateCard}
       onMoveCard={onMoveCard}
       onSelectCard={onSelectCard}

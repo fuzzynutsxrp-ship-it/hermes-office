@@ -29,8 +29,27 @@ const ADAPTER_PORT = parseInt(process.env.HERMES_ADAPTER_PORT || "18789", 10);
 const ADAPTER_URL = `ws://localhost:${ADAPTER_PORT}`;
 const HOME = process.env.HOME || "/tmp";
 
-// Task store path (matches shared-store.ts)
-const STORE_DIR = path.join(HOME, ".hermes", "state", "claw3d", "task-manager");
+// Task store path — must match src/lib/clawdbot/paths.ts resolveStateDir()
+// which is used by src/lib/tasks/shared-store.ts
+const LEGACY_STATE_DIRS = [".clawdbot", ".moltbot"];
+const NEW_STATE_DIR = ".openclaw";
+
+function resolveStateDir() {
+  const override =
+    (process.env.OPENCLAW_STATE_DIR || "").trim() ||
+    (process.env.MOLTBOT_STATE_DIR || "").trim() ||
+    (process.env.CLAWDBOT_STATE_DIR || "").trim();
+  if (override) return override.startsWith("~") ? override.replace(/^~/, HOME) : override;
+  const newPath = path.join(HOME, NEW_STATE_DIR);
+  if (fs.existsSync(newPath)) return newPath;
+  for (const legacy of LEGACY_STATE_DIRS) {
+    const legacyPath = path.join(HOME, legacy);
+    if (fs.existsSync(legacyPath)) return legacyPath;
+  }
+  return newPath; // default to new
+}
+
+const STORE_DIR = path.join(resolveStateDir(), "claw3d", "task-manager");
 const STORE_FILE = path.join(STORE_DIR, "tasks.json");
 
 // ---------------------------------------------------------------------------
@@ -336,6 +355,18 @@ workerTick();
 
 // Then poll every 60 seconds
 setInterval(workerTick, POLL_INTERVAL_MS);
+
+// Heartbeat — tell adapter we're alive every 15 seconds
+function sendHeartbeat() {
+  broadcastToClaw3D({
+    action: "worker_heartbeat",
+    agentId: WORKER_AGENT_ID,
+    timestamp: new Date().toISOString(),
+  });
+}
+setInterval(sendHeartbeat, 15_000);
+// Send first heartbeat shortly after connecting
+setTimeout(sendHeartbeat, 3_000);
 
 // Graceful shutdown
 process.on("SIGINT", () => {

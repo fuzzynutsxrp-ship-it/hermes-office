@@ -993,6 +993,26 @@ export function OfficeScreen({
   const runtimeSupportsCron = supportsCapability("cron");
   const runtimeSupportsModels = supportsCapability("models");
   const runtimeSupportsRunLifecycle = supportsCapability("runtime-agent-events");
+
+  // Poll worker status every 10 seconds
+  useEffect(() => {
+    if (status !== "connected") {
+      setWorkerOnline(false);
+      return;
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const result = await provider.call<{ online?: boolean }>("worker.status", {});
+        if (!cancelled) setWorkerOnline(Boolean(result.online));
+      } catch {
+        if (!cancelled) setWorkerOnline(false);
+      }
+    };
+    void poll();
+    const timer = setInterval(() => void poll(), 10_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [status, provider]);
   const { state, dispatch, hydrateAgents, setError, setLoading } =
     useAgentStore();
   const [agentsLoaded, setAgentsLoaded] = useState(false);
@@ -1033,6 +1053,7 @@ export function OfficeScreen({
   >("idle");
   const taskBoardEventHandlerRef = useRef<(event: EventFrame) => void>(() => {});
   const taskBoardRefreshRef = useRef<() => Promise<void>>(async () => {});
+  const [workerOnline, setWorkerOnline] = useState(false);
   const [officeTriggerState, setOfficeTriggerState] = useState(() =>
     createOfficeAnimationTriggerState(),
   );
@@ -2898,6 +2919,13 @@ export function OfficeScreen({
         return next.slice(-MAX_OPENCLAW_LOG_ENTRIES);
       });
       refreshRecentTransportSessionHistory(event);
+      // Track worker status
+      if (event.event === "worker.status") {
+        const payload = event.payload as { online?: boolean } | undefined;
+        if (payload && typeof payload.online === "boolean") {
+          setWorkerOnline(payload.online);
+        }
+      }
       setOfficeTriggerState((previous) =>
         reduceOfficeAnimationTriggerEvent({
           state: previous,
@@ -4889,6 +4917,7 @@ export function OfficeScreen({
             taskBoard.sharedTasksError ?? taskBoard.gatewayTasksError ?? taskBoard.cronError
           }
           taskBoardCaptureDebug={showOpenClawConsole ? taskBoard.taskCaptureDebug : undefined}
+          taskBoardWorkerOnline={workerOnline}
           onTaskBoardCreateCard={() => {
             taskBoard.createManualCard();
           }}
@@ -5088,6 +5117,7 @@ export function OfficeScreen({
                 taskBoard.sharedTasksError ?? taskBoard.gatewayTasksError ?? taskBoard.cronError
               }
               taskCaptureDebug={showOpenClawConsole ? taskBoard.taskCaptureDebug : undefined}
+              workerOnline={workerOnline}
               onCreateCard={() => {
                 taskBoard.createManualCard();
                 setActiveSidebarTab("kanban");

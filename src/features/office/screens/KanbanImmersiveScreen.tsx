@@ -17,6 +17,7 @@ export function KanbanImmersiveScreen({
   cronLoading,
   cronError,
   taskCaptureDebug,
+  workerOnline,
   onCreateCard,
   onMoveCard,
   onSelectCard,
@@ -33,6 +34,7 @@ export function KanbanImmersiveScreen({
   cronLoading: boolean;
   cronError: string | null;
   taskCaptureDebug?: ComponentProps<typeof TaskBoardView>["taskCaptureDebug"];
+  workerOnline: boolean;
   onCreateCard: () => void;
   onMoveCard: (cardId: string, status: TaskBoardStatus) => void;
   onSelectCard: (cardId: string | null) => void;
@@ -116,6 +118,7 @@ export function KanbanImmersiveScreen({
             cronLoading={cronLoading}
             cronError={cronError}
             taskCaptureDebug={taskCaptureDebug}
+            workerOnline={workerOnline}
             onCreateCard={onCreateCard}
             onMoveCard={onMoveCard}
             onSelectCard={onSelectCard}

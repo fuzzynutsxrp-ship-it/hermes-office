@@ -215,6 +215,10 @@ const activeRuns = new Map();
 /** @type {Map<string, object>} jobId → CronJobSummary */
 const cronJobs = new Map();
 
+/** @type {number} last worker heartbeat epoch (0 = never heard from) */
+let lastWorkerHeartbeatAt = 0;
+const WORKER_HEARTBEAT_TIMEOUT_MS = 45_000; // 3 missed heartbeats = offline
+
 /**
  * @type {Map<string, {
  *   id: string, name: string, workspace: string,
@@ -1169,6 +1173,20 @@ async function handleMethod(method, params, id, sendEvent) {
     case "office.workerEvent": {
       const action = typeof p.action === "string" ? p.action : "unknown";
       console.log(`[hermes-adapter] Worker event: ${action} — ${p.taskTitle || p.taskId || ""}`);
+
+      // Track heartbeat for worker status
+      if (action === "worker_heartbeat") {
+        const wasOffline = (Date.now() - lastWorkerHeartbeatAt) > WORKER_HEARTBEAT_TIMEOUT_MS;
+        lastWorkerHeartbeatAt = Date.now();
+        if (wasOffline && lastWorkerHeartbeatAt > 0) {
+          // Worker just came online — broadcast status change
+          broadcastEvent({
+            type: "event", event: "worker.status",
+            payload: { online: true, lastHeartbeatAt: lastWorkerHeartbeatAt },
+          });
+        }
+      }
+
       broadcastEvent({
         type: "event",
         event: "worker",
@@ -1193,6 +1211,14 @@ async function handleMethod(method, params, id, sendEvent) {
         },
       });
       return resOk(id, { ok: true, broadcast: true });
+    }
+
+    // --- Worker status ----------------------------------------------------
+
+    case "worker.status": {
+      const now = Date.now();
+      const online = lastWorkerHeartbeatAt > 0 && (now - lastWorkerHeartbeatAt) < WORKER_HEARTBEAT_TIMEOUT_MS;
+      return resOk(id, { online, lastHeartbeatAt: lastWorkerHeartbeatAt || null });
     }
 
     default:
@@ -1259,8 +1285,8 @@ function startAdapter() {
               "exec.approvals.get","exec.approvals.set","exec.approval.resolve",
               "wake","skills.status","models.list",
               "tasks.list",
-              "cron.list","cron.add","cron.remove","cron.patch","cron.run"],
-              events: ["chat","presence","heartbeat","cron","worker"] },
+              "cron.list","cron.add","cron.remove","cron.patch","cron.run","worker.status"],
+              events: ["chat","presence","heartbeat","cron","worker","worker.status"] },
             snapshot: { health: { agents: allAgents, defaultAgentId: AGENT_ID },
               sessionDefaults: { mainKey: MAIN_KEY } },
             auth: { role: "operator", scopes: ["operator.admin","operator.approvals"] },

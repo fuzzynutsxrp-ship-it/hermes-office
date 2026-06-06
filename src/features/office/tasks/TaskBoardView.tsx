@@ -51,6 +51,7 @@ export function TaskBoardView({
   cronLoading,
   cronError,
   taskCaptureDebug,
+  workerOnline,
   onCreateCard,
   onMoveCard,
   onSelectCard,
@@ -81,6 +82,7 @@ export function TaskBoardView({
     sharedTasksLoading: boolean;
     sharedTasksError: string | null;
   };
+  workerOnline: boolean;
   onCreateCard: () => void;
   onMoveCard: (cardId: string, status: TaskBoardStatus) => void;
   onSelectCard: (cardId: string | null) => void;
@@ -99,6 +101,16 @@ export function TaskBoardView({
             <div className="mt-1 font-mono text-[11px] text-white/40">{subtitle}</div>
           </div>
           <div className="flex items-center gap-2">
+            <div className={`inline-flex items-center gap-1.5 rounded border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.14em] ${
+              workerOnline
+                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
+                : "border-rose-500/40 bg-rose-500/10 text-rose-300"
+            }`}>
+              <span className={`h-2 w-2 rounded-full ${
+                workerOnline ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]" : "bg-rose-400"
+              }`} />
+              {workerOnline ? "Worker Online" : "Worker Offline"}
+            </div>
             <button
               type="button"
               onClick={onRefreshCronJobs}
