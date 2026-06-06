@@ -6,6 +6,7 @@ import { Plus, RefreshCw, Trash2 } from "lucide-react";
 import type { AgentState } from "@/features/agents/state/store";
 import type { CronJobSummary } from "@/lib/cron/types";
 import type { TaskBoardCard, TaskBoardStatus } from "@/features/office/tasks/types";
+import type { GatewayStatus } from "@/lib/gateway/GatewayClient";
 
 const STATUS_LABELS: Record<TaskBoardStatus, string> = {
   todo: "Todo",
@@ -40,6 +41,16 @@ const stopAndGetCardId = (event: DragEvent<HTMLElement>) => {
   return event.dataTransfer.getData("text/task-card-id").trim();
 };
 
+export type ConnectionDebugInfo = {
+  gatewayStatus: GatewayStatus;
+  gatewayUrl: string;
+  gatewayError: string | null;
+  workerOnline: boolean;
+  lastPollAt: number | null;
+  pollError: string | null;
+  onForceReconnect: () => void;
+};
+
 export function TaskBoardView({
   title,
   subtitle,
@@ -52,6 +63,7 @@ export function TaskBoardView({
   cronError,
   taskCaptureDebug,
   workerOnline,
+  connectionDebug,
   onCreateCard,
   onMoveCard,
   onSelectCard,
@@ -83,6 +95,7 @@ export function TaskBoardView({
     sharedTasksError: string | null;
   };
   workerOnline: boolean;
+  connectionDebug?: ConnectionDebugInfo;
   onCreateCard: () => void;
   onMoveCard: (cardId: string, status: TaskBoardStatus) => void;
   onSelectCard: (cardId: string | null) => void;
@@ -460,6 +473,81 @@ export function TaskBoardView({
           </aside>
         ) : null}
       </div>
+
+      {connectionDebug ? (
+        <ConnectionDebuggerBar debug={connectionDebug} />
+      ) : null}
     </section>
+  );
+}
+
+function resolveConnectionStatusText(debug: ConnectionDebugInfo): string {
+  const { gatewayStatus, gatewayUrl, gatewayError, workerOnline, lastPollAt, pollError } = debug;
+
+  if (gatewayStatus === "disconnected") {
+    if (gatewayError) {
+      return `Gateway disconnected — ${gatewayError}`;
+    }
+    return `Gateway disconnected. Target: ${gatewayUrl || "not set"}`;
+  }
+
+  if (gatewayStatus === "connecting") {
+    return `Connecting to gateway at ${gatewayUrl || "..."}...`;
+  }
+
+  // Gateway is connected
+  if (pollError) {
+    return `Gateway connected, but worker poll failed — ${pollError}`;
+  }
+
+  if (!workerOnline) {
+    if (lastPollAt) {
+      const secondsAgo = Math.round((Date.now() - lastPollAt) / 1000);
+      return `Gateway connected to ${gatewayUrl}, but worker is offline (last polled ${secondsAgo}s ago)`;
+    }
+    return `Gateway connected to ${gatewayUrl}, waiting for first worker poll...`;
+  }
+
+  return `All systems OK — gateway connected, worker online`;
+}
+
+function resolveStatusColor(debug: ConnectionDebugInfo): string {
+  const { gatewayStatus, gatewayError, workerOnline, pollError } = debug;
+
+  if (gatewayStatus === "disconnected") return "text-rose-400";
+  if (gatewayStatus === "connecting") return "text-amber-400";
+  if (gatewayError || pollError) return "text-rose-400";
+  if (!workerOnline) return "text-amber-400";
+  return "text-emerald-400";
+}
+
+function ConnectionDebuggerBar({ debug }: { debug: ConnectionDebugInfo }) {
+  const statusText = resolveConnectionStatusText(debug);
+  const statusColor = resolveStatusColor(debug);
+
+  return (
+    <div className="border-t border-white/8 bg-black/30 px-4 py-2">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`h-2 w-2 shrink-0 rounded-full ${
+            statusColor === "text-emerald-400"
+              ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.6)]"
+              : statusColor === "text-amber-400"
+                ? "bg-amber-400 animate-pulse"
+                : "bg-rose-400"
+          }`} />
+          <span className={`font-mono text-[10px] tracking-[0.08em] ${statusColor} truncate`}>
+            {statusText}
+          </span>
+        </div>
+        <button
+          type="button"
+          onClick={debug.onForceReconnect}
+          className="shrink-0 rounded border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1 font-mono text-[9px] uppercase tracking-[0.14em] text-cyan-200 transition-colors hover:border-cyan-400/50 hover:text-white"
+        >
+          Force Reconnect
+        </button>
+      </div>
+    </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import type { ComponentProps } from "react";
 import type { AgentState } from "@/features/agents/state/store";
-import { TaskBoardView } from "@/features/office/tasks/TaskBoardView";
+import { TaskBoardView, type ConnectionDebugInfo } from "@/features/office/tasks/TaskBoardView";
 import type { TaskBoardCard, TaskBoardStatus } from "@/features/office/tasks/types";
 import type { CronJobSummary } from "@/lib/cron/types";
 
@@ -16,6 +16,7 @@ export function TaskBoardPanel({
   cronError,
   taskCaptureDebug,
   workerOnline,
+  connectionDebug,
   onCreateCard,
   onMoveCard,
   onSelectCard,
@@ -32,6 +33,7 @@ export function TaskBoardPanel({
   cronError: string | null;
   taskCaptureDebug?: ComponentProps<typeof TaskBoardView>["taskCaptureDebug"];
   workerOnline: boolean;
+  connectionDebug?: ConnectionDebugInfo;
   onCreateCard: () => void;
   onMoveCard: (cardId: string, status: TaskBoardStatus) => void;
   onSelectCard: (cardId: string | null) => void;
@@ -52,6 +54,7 @@ export function TaskBoardPanel({
       cronError={cronError}
       taskCaptureDebug={taskCaptureDebug}
       workerOnline={workerOnline}
+      connectionDebug={connectionDebug}
       onCreateCard={onCreateCard}
       onMoveCard={onMoveCard}
       onSelectCard={onSelectCard}

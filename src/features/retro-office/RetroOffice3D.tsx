@@ -31,6 +31,7 @@ import { SettingsPanel } from "@/features/office/components/panels/SettingsPanel
 import { AtmImmersiveScreen } from "@/features/office/screens/AtmImmersiveScreen";
 import { GithubImmersiveScreen } from "@/features/office/screens/GithubImmersiveScreen";
 import { KanbanImmersiveScreen } from "@/features/office/screens/KanbanImmersiveScreen";
+import type { ConnectionDebugInfo } from "@/features/office/tasks/TaskBoardView";
 import {
   PhoneBoothImmersiveScreen,
   type PhoneCallStep,
@@ -2340,6 +2341,7 @@ export function RetroOffice3D({
   taskBoardCronError = null,
   taskBoardCaptureDebug,
   taskBoardWorkerOnline = false,
+  taskBoardConnectionDebug,
   onTaskBoardCreateCard,
   onTaskBoardMoveCard,
   onTaskBoardSelectCard,
@@ -2461,6 +2463,7 @@ export function RetroOffice3D({
     typeof KanbanImmersiveScreen
   >["taskCaptureDebug"];
   taskBoardWorkerOnline?: boolean;
+  taskBoardConnectionDebug?: ConnectionDebugInfo;
   onTaskBoardCreateCard?: () => void;
   onTaskBoardMoveCard?: (cardId: string, status: TaskBoardStatus) => void;
   onTaskBoardSelectCard?: (cardId: string | null) => void;
@@ -6467,6 +6470,7 @@ export function RetroOffice3D({
           cronError={taskBoardCronError}
           taskCaptureDebug={taskBoardCaptureDebug}
           workerOnline={taskBoardWorkerOnline}
+          connectionDebug={taskBoardConnectionDebug}
           onCreateCard={() => onTaskBoardCreateCard?.()}
           onMoveCard={(cardId, status) => onTaskBoardMoveCard?.(cardId, status)}
           onSelectCard={(cardId) => onTaskBoardSelectCard?.(cardId)}

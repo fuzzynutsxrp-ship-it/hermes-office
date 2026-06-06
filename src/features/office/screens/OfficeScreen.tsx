@@ -162,6 +162,7 @@ import { KanbanDisabledPanel } from "@/features/office/components/panels/KanbanD
 import { PlaybooksPanel } from "@/features/office/components/panels/PlaybooksPanel";
 import { SkillsMarketplaceModal } from "@/features/office/components/panels/SkillsMarketplaceModal";
 import { TaskBoardPanel } from "@/features/office/components/panels/TaskBoardPanel";
+import type { ConnectionDebugInfo } from "@/features/office/tasks/TaskBoardView";
 import { JukeboxPanel } from "@/features/spotify-jukebox/components/JukeboxPanel";
 import { JukeboxDisabledPanel } from "@/features/spotify-jukebox/components/JukeboxDisabledPanel";
 import { executeBrowserJukeboxCommand } from "@/features/spotify-jukebox/agentBridge";
@@ -998,15 +999,24 @@ export function OfficeScreen({
   useEffect(() => {
     if (status !== "connected") {
       setWorkerOnline(false);
+      setWorkerPollError(null);
       return;
     }
     let cancelled = false;
     const poll = async () => {
       try {
         const result = await provider.call<{ online?: boolean }>("worker.status", {});
-        if (!cancelled) setWorkerOnline(Boolean(result.online));
-      } catch {
-        if (!cancelled) setWorkerOnline(false);
+        if (!cancelled) {
+          setWorkerOnline(Boolean(result.online));
+          setLastWorkerPollAt(Date.now());
+          setWorkerPollError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setWorkerOnline(false);
+          setLastWorkerPollAt(Date.now());
+          setWorkerPollError(err instanceof Error ? err.message : "Poll failed");
+        }
       }
     };
     void poll();
@@ -1054,6 +1064,30 @@ export function OfficeScreen({
   const taskBoardEventHandlerRef = useRef<(event: EventFrame) => void>(() => {});
   const taskBoardRefreshRef = useRef<() => Promise<void>>(async () => {});
   const [workerOnline, setWorkerOnline] = useState(false);
+  const [lastWorkerPollAt, setLastWorkerPollAt] = useState<number | null>(null);
+  const [workerPollError, setWorkerPollError] = useState<string | null>(null);
+
+  const handleForceReconnect = useCallback(async () => {
+    disconnect();
+    setWorkerOnline(false);
+    setWorkerPollError(null);
+    setLastWorkerPollAt(null);
+    try {
+      await connect();
+    } catch {
+      // connect() handles its own errors
+    }
+  }, [connect, disconnect]);
+
+  const connectionDebug: ConnectionDebugInfo = useMemo(() => ({
+    gatewayStatus: status,
+    gatewayUrl,
+    gatewayError,
+    workerOnline,
+    lastPollAt: lastWorkerPollAt,
+    pollError: workerPollError,
+    onForceReconnect: handleForceReconnect,
+  }), [status, gatewayUrl, gatewayError, workerOnline, lastWorkerPollAt, workerPollError, handleForceReconnect]);
   const [officeTriggerState, setOfficeTriggerState] = useState(() =>
     createOfficeAnimationTriggerState(),
   );
@@ -4918,6 +4952,7 @@ export function OfficeScreen({
           }
           taskBoardCaptureDebug={showOpenClawConsole ? taskBoard.taskCaptureDebug : undefined}
           taskBoardWorkerOnline={workerOnline}
+          taskBoardConnectionDebug={connectionDebug}
           onTaskBoardCreateCard={() => {
             taskBoard.createManualCard();
           }}
@@ -5118,6 +5153,7 @@ export function OfficeScreen({
               }
               taskCaptureDebug={showOpenClawConsole ? taskBoard.taskCaptureDebug : undefined}
               workerOnline={workerOnline}
+              connectionDebug={connectionDebug}
               onCreateCard={() => {
                 taskBoard.createManualCard();
                 setActiveSidebarTab("kanban");
