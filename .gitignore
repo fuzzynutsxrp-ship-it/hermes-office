@@ -87,3 +87,4 @@ test-results
 .certs/
 .understand-anything/
 .next.old/
+.next-old-*

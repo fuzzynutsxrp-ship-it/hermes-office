@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, ChevronDown, ChevronLeft, ChevronRight, Mic } from "lucide-react";
+import { MessageSquare, ChevronDown, ChevronLeft, ChevronRight, Mic, ClipboardList } from "lucide-react";
 import { RetroOffice3D } from "@/features/retro-office/RetroOffice3D";
 import type { OfficeAgent } from "@/features/retro-office/core/types";
 import { RunningAvatarLoader } from "@/features/agents/components/RunningAvatarLoader";
@@ -159,6 +159,7 @@ import { AnalyticsPanel } from "@/features/office/components/panels/AnalyticsPan
 import { HistoryPanel } from "@/features/office/components/panels/HistoryPanel";
 import { InboxPanel } from "@/features/office/components/panels/InboxPanel";
 import { KanbanDisabledPanel } from "@/features/office/components/panels/KanbanDisabledPanel";
+import { KanbanImmersiveScreen } from "@/features/office/screens/KanbanImmersiveScreen";
 import { PlaybooksPanel } from "@/features/office/components/panels/PlaybooksPanel";
 import { SkillsMarketplaceModal } from "@/features/office/components/panels/SkillsMarketplaceModal";
 import { TaskBoardPanel } from "@/features/office/components/panels/TaskBoardPanel";
@@ -1185,6 +1186,7 @@ export function OfficeScreen({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [marketplaceOpen, setMarketplaceOpen] = useState(false);
   const [kanbanInstallPromptOpen, setKanbanInstallPromptOpen] = useState(false);
+  const [kanbanModalOpen, setKanbanModalOpen] = useState(false);
   const [kanbanInstallProgress, setKanbanInstallProgress] = useState<{
     active: boolean;
     percent: number;
@@ -5706,7 +5708,53 @@ export function OfficeScreen({
             </>
           )}
         </button>
+
+        <button
+          type="button"
+          onClick={() => setKanbanModalOpen(true)}
+          className="flex items-center gap-1.5 rounded border border-cyan-500/40 bg-[#0e0a04]/90 px-3 py-1.5 font-mono text-[11px] font-medium tracking-wider text-cyan-300/80 shadow-lg backdrop-blur transition-colors hover:border-cyan-400/60 hover:text-cyan-100"
+        >
+          <ClipboardList className="h-3.5 w-3.5" />
+          <span>KANBAN</span>
+          {Object.values(taskBoard.cardsByStatus).reduce((total, cards) => total + cards.length, 0) > 0 ? (
+            <span className="rounded bg-cyan-500/20 px-1 text-[10px] text-cyan-400">
+              {Object.values(taskBoard.cardsByStatus).reduce((total, cards) => total + cards.length, 0)}
+            </span>
+          ) : null}
+        </button>
       </div>
+
+      {kanbanModalOpen ? (
+        <KanbanImmersiveScreen
+          agents={state.agents}
+          cardsByStatus={taskBoard.cardsByStatus}
+          selectedCard={taskBoard.selectedCard}
+          activeRuns={taskBoard.activeRuns}
+          cronJobs={taskBoard.cronJobs}
+          cronLoading={taskBoard.cronLoading}
+          cronError={
+            taskBoard.sharedTasksError ?? taskBoard.gatewayTasksError ?? taskBoard.cronError
+          }
+          taskCaptureDebug={showOpenClawConsole ? taskBoard.taskCaptureDebug : undefined}
+          workerOnline={workerOnline}
+          connectionDebug={connectionDebug}
+          onCreateCard={() => {
+            taskBoard.createManualCard();
+          }}
+          onMoveCard={taskBoard.moveCard}
+          onSelectCard={(cardId) => {
+            taskBoard.selectCard(cardId);
+          }}
+          onUpdateCard={taskBoard.updateCard}
+          onDeleteCard={taskBoard.removeCard}
+          onRefreshCronJobs={() => {
+            void taskBoard.refreshSharedTasks();
+            void taskBoard.refreshRemoteTasks();
+            void taskBoard.refreshCronJobs();
+          }}
+          onClose={() => setKanbanModalOpen(false)}
+        />
+      ) : null}
 
       {mainVoiceState !== "idle" || mainVoiceError ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-40 flex justify-center">
