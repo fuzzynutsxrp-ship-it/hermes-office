@@ -25,6 +25,7 @@ const http = require("http");
 const https = require("https");
 const fs = require("fs");
 const path = require("path");
+const { spawn } = require("child_process");
 const { WebSocketServer } = require("ws");
 
 function loadDotenvFile(filePath) {
@@ -1306,5 +1307,78 @@ function startAdapter() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// Worker process management
+// ---------------------------------------------------------------------------
+
+let workerProcess = null;
+
+function spawnWorker() {
+  const workerPath = path.join(__dirname, "worker.js");
+  if (!fs.existsSync(workerPath)) {
+    console.log("[hermes-adapter] Worker script not found, skipping auto-start.");
+    return;
+  }
+
+  console.log("[hermes-adapter] Starting autonomous worker agent...");
+  workerProcess = spawn(process.execPath, [workerPath], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env, HERMES_ADAPTER_PORT: String(ADAPTER_PORT) },
+  });
+
+  workerProcess.stdout.on("data", (data) => {
+    const lines = data.toString("utf8").trim().split("\n");
+    for (const line of lines) {
+      if (line.trim()) console.log(`[worker] ${line}`);
+    }
+  });
+
+  workerProcess.stderr.on("data", (data) => {
+    const lines = data.toString("utf8").trim().split("\n");
+    for (const line of lines) {
+      if (line.trim()) console.error(`[worker] ${line}`);
+    }
+  });
+
+  workerProcess.on("exit", (code, signal) => {
+    if (signal === "SIGINT" || signal === "SIGTERM") {
+      console.log("[hermes-adapter] Worker stopped gracefully.");
+    } else if (code !== 0) {
+      console.warn(`[hermes-adapter] Worker exited with code ${code}. Restarting in 10s...`);
+      setTimeout(spawnWorker, 10_000);
+    } else {
+      console.log("[hermes-adapter] Worker exited cleanly.");
+    }
+    workerProcess = null;
+  });
+
+  workerProcess.on("error", (err) => {
+    console.error("[hermes-adapter] Failed to start worker:", err.message);
+    workerProcess = null;
+  });
+}
+
+function stopWorker() {
+  if (!workerProcess) return;
+  try {
+    workerProcess.kill("SIGTERM");
+  } catch {}
+}
+
+// Graceful shutdown — stop worker when adapter exits
+function setupGracefulShutdown() {
+  const shutdown = () => {
+    console.log("\n[hermes-adapter] Shutting down...");
+    stopWorker();
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+}
+
 loadHistoryFromDisk();
 startAdapter();
+setupGracefulShutdown();
+
+// Start worker after adapter is listening (give it 2s to bind the port)
+setTimeout(spawnWorker, 2000);
