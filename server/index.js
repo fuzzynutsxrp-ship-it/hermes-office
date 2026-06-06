@@ -1,11 +1,83 @@
 const http = require("node:http");
 const https = require("node:https");
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawn } = require("node:child_process");
 const next = require("next");
 
 const { createAccessGate } = require("./access-gate");
 const { createGatewayProxy } = require("./gateway-proxy");
 const { assertPublicHostAllowed, resolveHosts } = require("./network-policy");
 const { loadUpstreamGatewaySettings } = require("./studio-settings");
+
+// ---------------------------------------------------------------------------
+// Auto-start the Hermes Gateway Adapter (port 18789) + Worker
+// ---------------------------------------------------------------------------
+
+let adapterProcess = null;
+let adapterStartAt = 0;
+
+function spawnAdapter() {
+  const adapterPath = path.join(__dirname, "hermes-gateway-adapter.js");
+  if (!fs.existsSync(adapterPath)) {
+    console.warn("[server] Adapter script not found, skipping auto-start.");
+    return;
+  }
+
+  // Don't double-start if already running
+  if (adapterProcess) {
+    console.info("[server] Adapter already running, skipping.");
+    return;
+  }
+
+  console.info("[server] Starting Hermes Gateway Adapter + Worker...");
+  adapterStartAt = Date.now();
+  adapterProcess = spawn(process.execPath, [adapterPath], {
+    stdio: ["ignore", "pipe", "pipe"],
+    env: { ...process.env },
+  });
+
+  adapterProcess.stdout.on("data", (data) => {
+    for (const line of data.toString("utf8").trim().split("\n")) {
+      if (line.trim()) console.info(`[adapter] ${line}`);
+    }
+  });
+
+  adapterProcess.stderr.on("data", (data) => {
+    for (const line of data.toString("utf8").trim().split("\n")) {
+      if (line.trim()) console.error(`[adapter] ${line}`);
+    }
+  });
+
+  adapterProcess.on("exit", (code, signal) => {
+    const uptimeMs = Date.now() - adapterStartAt;
+    adapterProcess = null;
+    if (signal === "SIGINT" || signal === "SIGTERM") {
+      console.info("[server] Adapter stopped gracefully.");
+      return;
+    }
+    if (code !== 0) {
+      // If it died within 5s of starting, likely EADDRINUSE (port already taken)
+      // — don't restart in a loop, just log and continue.
+      if (uptimeMs < 5_000) {
+        console.warn(`[server] Adapter exited quickly (code ${code}). Port may already be in use. Skipping restart.`);
+      } else {
+        console.warn(`[server] Adapter exited with code ${code}. Restarting in 5s...`);
+        setTimeout(spawnAdapter, 5_000);
+      }
+    }
+  });
+
+  adapterProcess.on("error", (err) => {
+    console.error("[server] Failed to start adapter:", err.message);
+    adapterProcess = null;
+  });
+}
+
+function stopAdapter() {
+  if (!adapterProcess) return;
+  try { adapterProcess.kill("SIGTERM"); } catch {}
+}
 
 const resolvePort = () => {
   const raw = process.env.PORT?.trim() || "3000";
@@ -66,6 +138,15 @@ const generateHttpsCert = async () => {
 async function main() {
   const dev = process.argv.includes("--dev");
   const useHttps = process.argv.includes("--https") || process.env.HTTPS === "true";
+
+  // Auto-start the gateway adapter + worker (port 18789) before the UI server
+  spawnAdapter();
+
+  // Graceful shutdown — stop adapter when server exits
+  const shutdown = () => { stopAdapter(); process.exit(0); };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+
   const hostnames = Array.from(new Set(resolveHosts(process.env)));
   const hostname = hostnames[0] ?? "127.0.0.1";
   const port = resolvePort();
