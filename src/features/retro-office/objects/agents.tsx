@@ -13,6 +13,12 @@ import type {
   RenderAgent,
 } from "@/features/retro-office/core/types";
 import { AgentModelProps } from "@/features/retro-office/objects/types";
+import {
+  AngelHalo,
+  AngelWings,
+  AngelAura,
+  FloatingAnimation,
+} from "@/features/retro-office/objects/angel-features";
 
 const MAX_NAMEPLATE_TEXT_LENGTH = 10;
 const MAX_SPEECH_BUBBLE_TEXT_LENGTH = 180;
@@ -72,6 +78,8 @@ export const AgentModel = memo(function AgentModel({
   const statusDotMatRef = useRef<THREE.MeshBasicMaterial>(null);
   const pulseRingRef = useRef<THREE.Mesh>(null);
   const pulseRingMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const holoRingRef = useRef<THREE.Mesh>(null);
+  const holoRingMatRef = useRef<THREE.MeshStandardMaterial>(null);
   const leftEyeRef = useRef<THREE.Mesh>(null);
   const rightEyeRef = useRef<THREE.Mesh>(null);
   const leftEyeHighlightRef = useRef<THREE.Mesh>(null);
@@ -352,6 +360,22 @@ export const AgentModel = memo(function AgentModel({
         pulseRingRef.current.visible = true;
       } else {
         pulseRingRef.current.visible = false;
+      }
+    }
+
+    // Holographic processing ring — rotates and glows when agent is working
+    if (holoRingRef.current && holoRingMatRef.current) {
+      if (working && !isError) {
+        const time = agent.frame * 0.03;
+        holoRingRef.current.rotation.y = time * 2;
+        holoRingRef.current.rotation.x = Math.sin(time) * 0.15;
+        const bob = Math.sin(time * 1.5) * 0.02;
+        holoRingRef.current.position.y = 0.72 + bob;
+        const pulse = Math.sin(time * 3) * 0.15 + 0.85;
+        holoRingMatRef.current.emissiveIntensity = pulse * 1.5;
+        holoRingRef.current.visible = true;
+      } else {
+        holoRingRef.current.visible = false;
       }
     }
 
@@ -1099,6 +1123,25 @@ export const AgentModel = memo(function AgentModel({
           depthWrite={false}
         />
       </mesh>
+      {/* Holographic processing ring — ethereal glow above agent when working */}
+      <mesh
+        ref={holoRingRef}
+        position={[0, 0.72, 0]}
+        visible={false}
+      >
+        <torusGeometry args={[0.12, 0.008, 8, 32]} />
+        <meshStandardMaterial
+          ref={holoRingMatRef}
+          color="#60ffc0"
+          emissive="#40ff90"
+          emissiveIntensity={1.5}
+          transparent
+          opacity={0.7}
+          metalness={0.9}
+          roughness={0.1}
+          depthWrite={false}
+        />
+      </mesh>
       {!activeSpeechBubble && nameplateText ? (
         <Billboard position={[0, 1.05, 0]}>
           <mesh position={[0, 0, -0.001]}>
@@ -1241,6 +1284,26 @@ export const AgentModel = memo(function AgentModel({
           ) : null}
         </Billboard>
       </group>
+
+      {/* Angel features - ethereal appearance */}
+      <FloatingAnimation floatSpeed={0.4} floatHeight={0.03}>
+        {/* Angel halo above head */}
+        <AngelHalo position={[0, 0.65, 0]} />
+
+        {/* Angel wings on back */}
+        <AngelWings
+          position={[0, 0.3, -0.08]}
+          wingColor="#ffffff"
+          wingSpan={0.25}
+        />
+
+        {/* Ethereal aura glow */}
+        <AngelAura
+          position={[0, 0.3, 0]}
+          color="#e8d0ff"
+          size={0.4}
+        />
+      </FloatingAnimation>
     </group>
   );
 });

@@ -208,6 +208,7 @@ import {
   FloorAndWalls as SceneFloorAndWalls,
   WallPictures as SceneWallPictures,
 } from "@/features/retro-office/scene/environment";
+import { EtherealBloom } from "@/features/retro-office/objects/bloom-effect";
 import {
   CAMERA_PRESETS as CAMERA_PRESET_MAP,
   CameraAnimator as CameraPresetAnimator,
@@ -5247,12 +5248,12 @@ export function RetroOffice3D({
               agentLookupRef={renderAgentLookupRef}
             />
 
-            {/* Keep office lighting static to avoid extra scene churn from ambience effects. */}
-            <ambientLight intensity={0.72} color="#d8d4c8" />
+            {/* Ethereal cloud/angel lighting — dim ambient with strategic colored accents */}
+            <ambientLight intensity={0.35} color="#1a1030" />
             <directionalLight
               position={[8, 14, 6]}
-              intensity={1.1}
-              color="#f6f1e6"
+              intensity={0.45}
+              color="#8090ff"
               castShadow
               shadow-mapSize={[1024, 1024]}
               shadow-bias={-0.0002}
@@ -5260,8 +5261,39 @@ export function RetroOffice3D({
             />
             <directionalLight
               position={[-5, 8, -4]}
+              intensity={0.3}
+              color="#6030c0"
+            />
+            {/* Fill light — deep purple atmospheric */}
+            <pointLight
+              position={[0, 3, 0]}
+              intensity={0.5}
+              color="#6030c0"
+              distance={15}
+              decay={2}
+            />
+            {/* Rim light — subtle gold heavenly accent */}
+            <pointLight
+              position={[0, 8, -5]}
               intensity={0.4}
-              color="#7090ff"
+              color="#a08030"
+              distance={20}
+              decay={2}
+            />
+            {/* Colored atmospheric point lights */}
+            <pointLight position={[-5, 2, -3]} intensity={0.25} color="#7c3aed" distance={8} decay={2} />
+            <pointLight position={[5, 2, 3]} intensity={0.25} color="#3b82f6" distance={8} decay={2} />
+            <pointLight position={[3, 1.5, -4]} intensity={0.15} color="#a855f7" distance={6} decay={2} />
+            <pointLight position={[-3, 1.5, 4]} intensity={0.15} color="#6366f1" distance={6} decay={2} />
+            {/* Heavenly ray from above */}
+            <spotLight
+              position={[0, 10, 0]}
+              angle={0.6}
+              penumbra={0.8}
+              intensity={0.15}
+              color="#8060ff"
+              distance={15}
+              decay={2}
             />
 
             {/* Floor + walls — always visible, no async loading. */}
@@ -5827,6 +5859,9 @@ export function RetroOffice3D({
               onMove={handleFloorMove}
               onClick={handleFloorClick}
             />
+
+            {/* Ethereal bloom post-processing — makes emissive materials glow */}
+            <EtherealBloom />
           </Canvas>
         ) : null}
       </div>

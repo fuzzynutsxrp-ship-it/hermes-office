@@ -69,26 +69,43 @@ export const FURNITURE_Y_OFFSET: Record<string, number> = {
 export const KANBAN_CLUTTER_OFFSET = { x: -1, y: 1, z: -2 };
 
 export const FURNITURE_TINT: Record<string, string | null> = {
-  desk_cubicle: "#8b5e32",
-  executive_desk: "#6b3c1a",
-  chair: "#4a5568",
-  round_table: "#9a6332",
-  couch: "#3d5575",
-  couch_v: "#5a4870",
-  bookshelf: "#5c3520",
+  // ── Ethereal cloud/angel theme tints ──
+  // Desks: dark indigo with purple undertone
+  desk_cubicle: "#1a1040",
+  executive_desk: "#150a30",
+  // Chairs: silver-blue with ethereal sheen
+  chair: "#2a3050",
+  // Tables: deep smoked charcoal with purple
+  round_table: "#1a1535",
+  // Seating: deep indigo-violet
+  couch: "#151040",
+  couch_v: "#1a1248",
+  // Storage: dark wood replaced with cosmic purple-brown
+  bookshelf: "#1a0e30",
+  // Beanbags: tinted via item.color, not here
   beanbag: null,
-  computer: "#363c58",
-  pingpong: "#2d6048",
-  table_rect: "#7a5028",
-  coffee_machine: "#2d2d38",
-  fridge: "#505a60",
-  water_cooler: "#3a5070",
-  whiteboard: "#f4f2ee",
-  kanban_board: "#8b5e32",
-  cabinet: "#3c4248",
+  // Monitors: dark housing — the screen glow comes from the GLB emissive
+  computer: "#0d0820",
+  // Recreation: deep cosmic green-black
+  pingpong: "#0a1a15",
+  // Tables: dark charcoal-purple
+  table_rect: "#15102a",
+  // Kitchen: dark metallic with purple reflection
+  coffee_machine: "#12101e",
+  fridge: "#151525",
+  water_cooler: "#101828",
+  // Whiteboard: crystal surface — faint glow
+  whiteboard: "#1a1540",
+  // Kanban: same dark indigo as desks
+  kanban_board: "#1a1040",
+  // Cabinets: dark metallic
+  cabinet: "#12121e",
+  // Plants: no tint — their green is the accent color
   plant: null,
-  lamp: "#c8a060",
-  printer: "#404858",
+  // Lamps: warm gold halo (angel accent)
+  lamp: "#3a2a10",
+  // Printer/misc
+  printer: "#12121e",
 };
 
 const SHADOW_CASTING_FURNITURE_TYPES = new Set([

@@ -1163,6 +1163,37 @@ async function handleMethod(method, params, id, sendEvent) {
       return resOk(id, { ok: true, ran: true });
     }
 
+    // --- Worker events ----------------------------------------------------
+
+    case "office.workerEvent": {
+      const action = typeof p.action === "string" ? p.action : "unknown";
+      console.log(`[hermes-adapter] Worker event: ${action} — ${p.taskTitle || p.taskId || ""}`);
+      broadcastEvent({
+        type: "event",
+        event: "worker",
+        payload: {
+          action,
+          taskId: p.taskId || null,
+          taskTitle: p.taskTitle || null,
+          agentId: p.agentId || "Hermes-Worker-1",
+          agentState: p.agentState || "idle",
+          deskZone: p.deskZone || null,
+          resultNotes: p.resultNotes || null,
+          timestamp: p.timestamp || new Date().toISOString(),
+        },
+      });
+      broadcastEvent({
+        type: "event", event: "presence",
+        payload: {
+          sessions: {
+            recent: [{ key: `agent:hermes-worker-1:main`, updatedAt: Date.now() }],
+            byAgent: [{ agentId: "hermes-worker-1", recent: [{ key: `agent:hermes-worker-1:main`, updatedAt: Date.now() }] }],
+          },
+        },
+      });
+      return resOk(id, { ok: true, broadcast: true });
+    }
+
     default:
       console.warn(`[hermes-adapter] Unhandled method: ${method}`);
       return resOk(id, {});
@@ -1228,7 +1259,7 @@ function startAdapter() {
               "wake","skills.status","models.list",
               "tasks.list",
               "cron.list","cron.add","cron.remove","cron.patch","cron.run"],
-              events: ["chat","presence","heartbeat","cron"] },
+              events: ["chat","presence","heartbeat","cron","worker"] },
             snapshot: { health: { agents: allAgents, defaultAgentId: AGENT_ID },
               sessionDefaults: { mainKey: MAIN_KEY } },
             auth: { role: "operator", scopes: ["operator.admin","operator.approvals"] },

@@ -231,9 +231,17 @@ export function TaskBoardView({
                             <div className="line-clamp-2 text-sm font-medium text-white/90">
                               {card.title}
                             </div>
-                            <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/50">
-                              {card.source.replaceAll("_", " ")}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {card.status === "in_progress" && card.assignedAgentId ? (
+                                <span className="inline-flex items-center gap-1 rounded border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-emerald-300 animate-pulse">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                                  Working
+                                </span>
+                              ) : null}
+                              <span className="rounded border border-white/10 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/50">
+                                {card.source.replaceAll("_", " ")}
+                              </span>
+                            </div>
                           </div>
                           {card.description ? (
                             <div className="mt-2 line-clamp-3 text-[12px] leading-5 text-white/55">
@@ -245,6 +253,11 @@ export function TaskBoardView({
                             {card.runId ? <span>Run linked.</span> : null}
                             {card.playbookJobId ? <span>Playbook linked.</span> : null}
                           </div>
+                          {card.status === "done" && card.notes.length > 0 ? (
+                            <div className="mt-2 rounded border border-emerald-500/20 bg-emerald-500/5 px-2 py-1.5 text-[11px] leading-4 text-emerald-300/80">
+                              {card.notes[card.notes.length - 1]}
+                            </div>
+                          ) : null}
                           <div className="mt-2 font-mono text-[10px] text-white/32">
                             {formatRelativeTime(card.lastActivityAt ?? card.updatedAt)}
                           </div>

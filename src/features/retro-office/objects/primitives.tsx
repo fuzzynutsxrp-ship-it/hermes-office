@@ -60,7 +60,7 @@ export function InstancedWallSegmentsModel({
   return (
     <instancedMesh ref={meshRef} args={[undefined, undefined, items.length]} receiveShadow>
       <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="#787878" roughness={0.92} />
+      <meshStandardMaterial color="#1a1040" roughness={0.92} emissive="#2a1870" emissiveIntensity={0.15} />
     </instancedMesh>
   );
 }
@@ -175,7 +175,7 @@ export function WallSegmentModel({
         <mesh position={[0, 0.5, 0]} receiveShadow>
           <boxGeometry args={[width, 1, depth]} />
           <meshStandardMaterial
-            color="#787878"
+            color="#1a1040"
             emissive={highlightColor}
             emissiveIntensity={0.4 + highlightIntensity}
             roughness={0.92}
@@ -183,7 +183,7 @@ export function WallSegmentModel({
         </mesh>
         <mesh position={[0, 0.03, 0]}>
           <boxGeometry args={[width + 0.02, 0.06, Math.max(depth, 0.06)]} />
-          <meshStandardMaterial color="#0c0c10" roughness={0.8} />
+          <meshStandardMaterial color="#0c0620" roughness={0.8} emissive="#1a0a40" emissiveIntensity={0.1} />
         </mesh>
       </group>
     </group>
